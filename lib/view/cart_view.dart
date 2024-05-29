@@ -1,4 +1,9 @@
+// import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'package:e_commerce/config/router/app_route.dart';
+import 'package:e_commerce/view/home_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:khalti_flutter/khalti_flutter.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 
 import '../models/purchase_entity.dart';
@@ -6,14 +11,14 @@ import '../service/shopping.dart';
 import '../state/purchase_state.dart';
 import 'widgets/snackbar_messenger.dart';
 
-class CartView extends StatefulWidget {
+class CartView extends ConsumerStatefulWidget {
   const CartView({super.key});
 
   @override
-  State<CartView> createState() => _CartViewState();
+  ConsumerState<ConsumerStatefulWidget> createState() => _CartViewState();
 }
 
-class _CartViewState extends State<CartView> {
+class _CartViewState extends ConsumerState<CartView> {
   List<PurchaseEntity> purchaseList = PurchaseState.purchaseState;
 
   void _removeProduct(PurchaseEntity purchaseProduct) {
@@ -30,6 +35,62 @@ class _CartViewState extends State<CartView> {
     );
   }
 
+  // Khalti payment integration // Step 5
+  void _openKhaltiPaymentView() {
+    final config = PaymentConfig(
+      // amount must be in Paisa not Rs so multiply by 100 and amount must < Rs 200
+      amount: (Shopping.getTotalPrice).toInt() * 100,
+      productIdentity:
+          'ML123', // add id or something that uniquely identifies the product
+      productName: 'productName', // product name
+      additionalData: {
+        'vendor': 'vendor name', // used for reporting purpose but not mandatory
+      },
+
+      mobileReadOnly:
+          false, // makes the mobile field not editable -- not mandatory to use
+    );
+
+    KhaltiScope.of(context).pay(
+      config: config,
+
+      // add a list of preferences which you want to give services to the users for payment such as khalti, mobile banking etc
+      preferences: const [
+        PaymentPreference.khalti,
+        PaymentPreference.connectIPS,
+        PaymentPreference.eBanking,
+        PaymentPreference.mobileBanking,
+        PaymentPreference.sct,
+      ],
+      onSuccess: (onSuccess) {
+        showSnackBarMsg(
+          context: context,
+          message: 'Payment success.',
+          bgColor: Colors.green,
+        );
+
+        Shopping.resetPurchase();
+        ref.watch(purchaseSelectorProvider.notifier).state = 0;
+        Navigator.pushNamed(context, AppRoute.homeRoute);
+      },
+      onFailure: (onFailure) {
+        showSnackBarMsg(
+          context: context,
+          message: 'Failed to pay.',
+          bgColor: Colors.red,
+        );
+      },
+      onCancel: () {
+        showSnackBarMsg(
+          context: context,
+          message: 'Canceled to payment proceed.',
+          bgColor: Colors.pink,
+        );
+        Navigator.pushNamed(context, AppRoute.homeRoute);
+      },
+    );
+  }
+
   void _confirmPay() {
     Alert(
       context: context,
@@ -38,7 +99,8 @@ class _CartViewState extends State<CartView> {
       desc: "Do you want to purchase?",
       buttons: [
         DialogButton(
-          onPressed: () => Navigator.pop(context),
+          // Khalti payment integration // Step 4 : call the function
+          onPressed: _openKhaltiPaymentView,
           color: const Color.fromRGBO(0, 179, 134, 1.0),
           child: const Text(
             "Yes",
